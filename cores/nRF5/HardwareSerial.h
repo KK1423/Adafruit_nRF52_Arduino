@@ -77,7 +77,7 @@ class HardwareSerial : public Stream
 extern void serialEventRun(void) __attribute__((weak));
 extern void serialEvent() __attribute__((weak));
 
-#ifndef NRF52832_XXAA // 832 only has 1 UART for Serial
+#if !defined(NRF52832_XXAA) || defined(RTT_SERIAL) // 832 only has 1 UART for Serial
 extern void serialEvent1() __attribute__((weak));
 extern void serialEvent2() __attribute__((weak));
 #endif

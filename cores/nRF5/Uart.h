@@ -89,7 +89,7 @@ class Uart : public HardwareSerial
 //
 // SERIAL_PORT_HARDWARE_OPEN  Hardware serial ports which are open for use.  Their RX & TX
 //                            pins are NOT connected to anything by default.
-#ifdef NRF52832_XXAA
+#if defined(NRF52832_XXAA) && !defined(RTT_SERIAL)
   #define SERIAL_PORT_MONITOR         Serial
   #define SERIAL_PORT_HARDWARE        Serial
 
