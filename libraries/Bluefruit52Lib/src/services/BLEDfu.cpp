@@ -71,19 +71,27 @@ const uint8_t UUID128_CHR_DFU_REVISON[16] =
 
 extern "C" void bootloader_util_app_start(uint32_t start_addr);
 
-static uint16_t crc16(const uint8_t* data_p, uint8_t length)
-{
-  uint8_t x;
-  uint16_t crc = 0xFFFF;
 
-  while ( length-- )
-  {
-    x = crc >> 8 ^ *data_p++;
-    x ^= x >> 4;
-    crc = (crc << 8) ^ ((uint16_t) (x << 12)) ^ ((uint16_t) (x << 5)) ^ ((uint16_t) x);
-  }
-  return crc;
-}
+#define BOOTLOADER_SVC_BASE     0x0     /**< The number of the lowest SVC number reserved for the bootloader. */
+#define SYSTEM_SERVICE_ATT_SIZE 8       /**< Size of the system service attribute length including CRC-16 at the end. */  
+
+/**@brief The SVC numbers used by the SVC functions in the SoC library. */
+enum BOOTLOADER_SVCS
+{
+    DFU_BLE_SVC_PEER_DATA_SET = BOOTLOADER_SVC_BASE,    /**< SVC number for the setting of peer data call. */
+    BOOTLOADER_SVC_LAST
+};
+
+typedef struct
+{
+    ble_gap_addr_t      addr;                                   /**< BLE GAP address of the device that initiated the DFU process. */
+    ble_gap_irk_t       irk;                                    /**< IRK of the device that initiated the DFU process if this device uses Private Resolvable Addresses. */
+    ble_gap_enc_key_t   enc_key;                                /**< Encryption key structure containing encrypted diversifier and LTK for re-establishing the bond. */
+    uint8_t             sys_attr[SYSTEM_SERVICE_ATT_SIZE];      /**< System service attributes for restoring of Service Changed Indication setting in DFU mode. */
+} dfu_ble_peer_data_t;
+
+SVCALL(DFU_BLE_SVC_PEER_DATA_SET, uint32_t, dfu_ble_svc_peer_data_set(dfu_ble_peer_data_t * p_peer_data));
+
 
 static void bledfu_control_wr_authorize_cb(uint16_t conn_hdl, BLECharacteristic* chr, ble_gatts_evt_write_t* request)
 {
@@ -109,17 +117,6 @@ static void bledfu_control_wr_authorize_cb(uint16_t conn_hdl, BLECharacteristic*
     enum { START_DFU  = 1 };
     if ( request->data[0] == START_DFU )
     {
-      // Peer data information so that bootloader could re-connect after reboot
-      typedef struct {
-        ble_gap_addr_t    addr;
-        ble_gap_irk_t     irk;
-        ble_gap_enc_key_t enc_key;
-        uint8_t           sys_attr[8];
-        uint16_t          crc16;
-      }peer_data_t;
-
-      VERIFY_STATIC(offsetof(peer_data_t, crc16) == 60);
-
       /* Save Peer data
        * Peer data address is defined in bootloader linker @0x20007F80
        * - If bonded : save Security information
@@ -127,15 +124,15 @@ static void bledfu_control_wr_authorize_cb(uint16_t conn_hdl, BLECharacteristic*
        *
        * TODO may force bonded only for security reason
        */
-      peer_data_t* peer_data = (peer_data_t*) (0x20007F80UL);
-      varclr(peer_data);
+      dfu_ble_peer_data_t peer_data;
+      varclr(&peer_data);
 
       // Get CCCD
-      uint16_t sysattr_len = sizeof(peer_data->sys_attr);
-      sd_ble_gatts_sys_attr_get(conn_hdl, peer_data->sys_attr, &sysattr_len, BLE_GATTS_SYS_ATTR_FLAG_SYS_SRVCS);
+      uint16_t sysattr_len = sizeof(peer_data.sys_attr);
+      sd_ble_gatts_sys_attr_get(conn_hdl, peer_data.sys_attr, &sysattr_len, BLE_GATTS_SYS_ATTR_FLAG_SYS_SRVCS);
 
       // Get Bond Data or using Address if not bonded
-      peer_data->addr = conn->getPeerAddr();
+      peer_data.addr = conn->getPeerAddr();
 
       if ( conn->paired() )
       {
@@ -143,14 +140,12 @@ static void bledfu_control_wr_authorize_cb(uint16_t conn_hdl, BLECharacteristic*
 
         if ( conn->loadKeys(&bkeys) )
         {
-          peer_data->addr    = bkeys.peer_id.id_addr_info;
-          peer_data->irk     = bkeys.peer_id.id_info;
-          peer_data->enc_key = bkeys.own_enc;
+          peer_data.addr    = bkeys.peer_id.id_addr_info;
+          peer_data.irk     = bkeys.peer_id.id_info;
+          peer_data.enc_key = bkeys.own_enc;
         }
       }
 
-      // Calculate crc
-      peer_data->crc16 = crc16((uint8_t*) peer_data, offsetof(peer_data_t, crc16));
 
       // Initiate DFU Sequence and reboot into DFU OTA mode
       Bluefruit.Advertising.restartOnDisconnect(false);
@@ -177,7 +172,7 @@ static void bledfu_control_wr_authorize_cb(uint16_t conn_hdl, BLECharacteristic*
 //      NRF_RTC1->TASKS_CLEAR = 1;
 
       VERIFY_STATUS( sd_softdevice_vector_table_base_set(NRF_UICR->NRFFW[0]), );
-
+      dfu_ble_svc_peer_data_set(&peer_data);
       __set_CONTROL(0); // switch to MSP, required if using FreeRTOS
       bootloader_util_app_start(NRF_UICR->NRFFW[0]);
     }
