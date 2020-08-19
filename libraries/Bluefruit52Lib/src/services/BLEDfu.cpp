@@ -134,11 +134,10 @@ static void bledfu_control_wr_authorize_cb(uint16_t conn_hdl, BLECharacteristic*
       // Get Bond Data or using Address if not bonded
       peer_data.addr = conn->getPeerAddr();
 
-      if ( conn->paired() )
+      if ( conn->secured() )
       {
         bond_keys_t bkeys;
-
-        if ( conn->loadKeys(&bkeys) )
+        if ( conn->loadBondKey(&bkeys) )
         {
           peer_data.addr    = bkeys.peer_id.id_addr_info;
           peer_data.irk     = bkeys.peer_id.id_info;
@@ -179,7 +178,8 @@ static void bledfu_control_wr_authorize_cb(uint16_t conn_hdl, BLECharacteristic*
   }
 }
 
-BLEDfu::BLEDfu(void) : BLEService(UUID128_SVC_DFU_OTA), _chr_control(UUID128_CHR_DFU_CONTROL)
+BLEDfu::BLEDfu(void)
+ : BLEService(UUID128_SVC_DFU_OTA), _chr_control(UUID128_CHR_DFU_CONTROL)
 {
 
 }

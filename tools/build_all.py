@@ -44,7 +44,10 @@ def build_examples(variant):
     
     fqbn = "adafruit:nrf52:{}:softdevice={},debug=l0".format(variant, 's140v6' if variant != 'feather52832' else 's132v6')
 
-    for sketch in glob.iglob('libraries/**/*.ino', recursive=True):
+    all_sketches = list(glob.iglob('libraries/**/*.ino', recursive=True))
+    all_sketches.sort()
+    
+    for sketch in all_sketches:
         start_time = time.monotonic()
 
         # Skip if contains: ".board.test.skip" or ".all.test.skip"
@@ -82,7 +85,6 @@ def build_examples(variant):
                 success_count += 1
 
         build_duration = time.monotonic() - start_time
-
         print(build_format.format(sketch.split(os.path.sep)[1], os.path.basename(sketch), success, '{:5.2f}s'.format(build_duration)))
 
         if success != "\033[33mskipped\033[0m  ":
