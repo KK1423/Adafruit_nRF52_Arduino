@@ -38,5 +38,7 @@ const uint32_t g_ADigitalPinMap[] = {
 
 void initVariant()
 {
+  pinMode(PIN_SDB, OUTPUT);
+  digitalWrite(PIN_SDB, LOW); // init with LED array turned off
 }
 
