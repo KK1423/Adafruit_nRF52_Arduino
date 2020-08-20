@@ -60,6 +60,7 @@
 // Services
 #include "services/BLEDis.h"
 #include "services/BLEDfu.h"
+#include "services/BLEBms.h"
 #include "services/BLEUart.h"
 #include "services/BLEBas.h"
 #include "services/BLEBeacon.h"
