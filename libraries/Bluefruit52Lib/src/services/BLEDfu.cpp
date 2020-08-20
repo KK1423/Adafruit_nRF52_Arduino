@@ -199,6 +199,7 @@ err_t BLEDfu::begin(void)
   _chr_control.setProperties(CHR_PROPS_WRITE | CHR_PROPS_NOTIFY);
   _chr_control.setMaxLen(23);
   _chr_control.setWriteAuthorizeCallback(bledfu_control_wr_authorize_cb);
+  _chr_control.setPermission(SECMODE_OPEN, SECMODE_ENC_WITH_MITM);
   VERIFY_STATUS( _chr_control.begin() );
 
   BLECharacteristic chr_revision(UUID128_CHR_DFU_REVISON);
