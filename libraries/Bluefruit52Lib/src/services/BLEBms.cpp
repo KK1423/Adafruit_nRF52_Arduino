@@ -60,6 +60,16 @@
 #define BLE_BMS_ALL_EXCEPT_REQUESTING_DEVICE_LE (0x01 << 16)
 #define BLE_BMS_ALL_EXCEPT_REQUESTING_DEVICE_LE_AUTH_CODE (0x01 << 17)
 
+#define BLE_BMS_OPCODE_REQUESTING_DEVICE_BR_LE              0x01
+#define BLE_BMS_OPCODE_REQUESTING_DEVICE_BR                 0x02
+#define BLE_BMS_OPCODE_REQUESTING_DEVICE_LE                 0x03
+#define BLE_BMS_OPCODE_ALL_BONDS_BR_LE                      0x04
+#define BLE_BMS_OPCODE_ALL_BONDS_BR                         0x05
+#define BLE_BMS_OPCODE_ALL_BONDS_LE                         0x06
+#define BLE_BMS_OPCODE_ALL_EXCEPT_REQUESTING_DEVICE_BR_LE   0x07
+#define BLE_BMS_OPCODE_ALL_EXCEPT_REQUESTING_DEVICE_BR      0x08
+#define BLE_BMS_OPCODE_ALL_EXCEPT_REQUESTING_DEVICE_LE      0x09
+
 BLEBms::BLEBms(void)
     : BLEService(UUID16_BMS_SERVICE), _chr_control(UUID16_BMS_CONTROL)
 {
@@ -72,24 +82,29 @@ void BMSWriteCallback(uint16_t conn_hdl, BLECharacteristic *chr, uint8_t *data, 
     if (len == 1)
     {
         bond_keys_t keys;
+        BLEConnection &conn = *Bluefruit.Connection(conn_hdl);
         switch (data[0])
         {
-        case 0x03: // Delete requesting
-            Bluefruit.Connection(conn_hdl)->removeBondKey();
+        case BLE_BMS_OPCODE_REQUESTING_DEVICE_LE:
+            conn.removeBondKey();
             break;
 
-        case 0x09: // Delete all except requesting
-            Bluefruit.Connection(conn_hdl)->loadBondKey(&keys);
-        case 0x06: // Delete all
-            Bluefruit.Periph.clearBonds();
-            break;
+        case BLE_BMS_OPCODE_ALL_EXCEPT_REQUESTING_DEVICE_LE: 
+            conn.loadBondKey(&keys);
             
+        case BLE_BMS_OPCODE_ALL_BONDS_LE:
+            if (conn.getRole() == BLE_GAP_ROLE_PERIPH)
+                Bluefruit.Periph.clearBonds();
+            else
+                Bluefruit.Central.clearBonds();
+            break;
+
         default:
-        break;
+            break;
         }
 
-        if(data[0] == 0x09)
-            Bluefruit.Connection(conn_hdl)->saveBondKey(&keys);
+        if (data[0] == BLE_BMS_OPCODE_ALL_EXCEPT_REQUESTING_DEVICE_LE)
+            conn.saveBondKey(&keys);
     }
 }
 
